@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import * as SockJS from "sockjs-client";
 import { Stomp } from "@stomp/stompjs";
 import { Send, User } from "lucide-react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 
 interface ChatMessage {
     sender: string;
@@ -24,8 +24,9 @@ const ChatRoom: React.FC = () => {
 
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const searchParams = useSearchParams();
+    const router = useRouter();
 
-    // 현재 로그인한 사용자 아이디를 불러옵니다.
+    // 현재 로그인한 사용자 정보 가져오기 (로그인 안되어 있으면 /login으로 리다이렉트)
     useEffect(() => {
         const fetchCurrentUser = async () => {
             try {
@@ -36,16 +37,17 @@ const ChatRoom: React.FC = () => {
                     const data = await response.text();
                     setUsername(data);
                 } else {
-                    console.warn("User is not logged in or /me returned error");
+                    router.push("/login");
                 }
             } catch (err) {
-                console.error("Failed to fetch current user:", err);
+                console.error("현재 사용자 정보를 가져오는 중 오류 발생:", err);
+                router.push("/login");
             }
         };
         fetchCurrentUser();
-    }, []);
+    }, [router]);
 
-    // URL 쿼리 파라미터에서 roomId 또는 receiver를 가져와 설정합니다.
+    // URL 쿼리 파라미터에서 roomId 또는 receiver 가져오기
     useEffect(() => {
         if (!username) return;
         const roomParam = searchParams.get("roomId");
@@ -53,46 +55,59 @@ const ChatRoom: React.FC = () => {
 
         if (roomParam) {
             setRoomId(roomParam);
-            // roomParam 형식: "userA:userB"
             const parts = roomParam.split(":");
             if (parts.length === 2) {
-                // 현재 사용자가 어느쪽에 있는지 확인 후, 반대편을 receiver로 설정
-                if (parts[0] === username) {
-                    setReceiver(parts[1]);
-                } else {
-                    setReceiver(parts[0]);
-                }
+                setReceiver(parts[0] === username ? parts[1] : parts[0]);
             }
         } else if (receiverParam) {
             setReceiver(receiverParam);
-            // username과 receiver를 비교해 roomId 생성
-            const computedRoomId = username < receiverParam ? `${username}:${receiverParam}` : `${receiverParam}:${username}`;
+            const computedRoomId =
+                username < receiverParam
+                    ? `${username}:${receiverParam}`
+                    : `${receiverParam}:${username}`;
             setRoomId(computedRoomId);
         }
     }, [username, searchParams]);
 
-    // 메시지 업데이트 시 스크롤 하단으로 이동
+    // 채팅방에 입장하면 읽음 처리 API를 호출하여 lastReadAt 업데이트
+    useEffect(() => {
+        if (username && roomId) {
+            fetch(`http://localhost:8080/api/chatrooms/${roomId}/read?username=${username}`, {
+                method: "POST",
+                credentials: "include",
+            })
+                .then((res) => {
+                    if (!res.ok) {
+                        console.error("읽음 처리 실패");
+                    }
+                })
+                .catch((error) => console.error("읽음 처리 중 오류 발생:", error));
+        }
+    }, [username, roomId]);
+
+    // 메시지 업데이트 시 스크롤을 최하단으로 이동
     useEffect(() => {
         if (messagesEndRef.current) {
             messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
         }
     }, [messages]);
 
-    // 채팅 이력을 불러옵니다.
+    // 채팅 이력 불러오기
     const loadHistory = async () => {
         if (!roomId) return;
         try {
-            const response = await fetch(`http://localhost:8080/api/chat/historyByRoom?roomId=${roomId}`, {
-                credentials: "include",
-            });
+            const response = await fetch(
+                `http://localhost:8080/api/chat/historyByRoom?roomId=${roomId}`,
+                { credentials: "include" }
+            );
             if (response.ok) {
                 const data: ChatMessage[] = await response.json();
                 setMessages(data);
             } else {
-                console.error("Failed to fetch history", response.status);
+                console.error("채팅 이력 조회 실패", response.status);
             }
         } catch (error) {
-            console.error("Error fetching history:", error);
+            console.error("채팅 이력 조회 중 오류 발생:", error);
         }
     };
 
@@ -100,14 +115,11 @@ const ChatRoom: React.FC = () => {
     useEffect(() => {
         if (!username || !receiver || !roomId) return;
         loadHistory();
-
         const socket = new SockJS("http://localhost:8080/ws-chat");
         const client = Stomp.over(socket);
         client.connect({}, (frame: any) => {
             console.log("Connected: " + frame);
             setIsConnected(true);
-
-            // 채팅방 토픽 구독
             client.subscribe(`/topic/chat/${roomId}`, (message: any) => {
                 const msg: ChatMessage = JSON.parse(message.body);
                 setMessages((prev) => [...prev, msg]);
@@ -115,13 +127,11 @@ const ChatRoom: React.FC = () => {
         });
         setStompClient(client);
 
-        // 컴포넌트 언마운트 시 연결 해제
         return () => {
             if (client) client.disconnect(() => console.log("Disconnected"));
         };
     }, [username, receiver, roomId]);
 
-    // 메시지 전송
     const sendMessage = () => {
         if (!stompClient) {
             alert("먼저 연결해주세요");
@@ -131,58 +141,109 @@ const ChatRoom: React.FC = () => {
             alert("메시지를 입력해주세요");
             return;
         }
-
         const chatMessage: ChatMessage = {
             sender: username,
             receiver: receiver,
             content: content,
             timestamp: new Date().toISOString(),
         };
-
         stompClient.send("/app/chat.send", {}, JSON.stringify(chatMessage));
         setContent("");
     };
 
-    // 엔터키로 메시지 전송
     const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === "Enter") {
-            sendMessage();
+        if (e.key === "Enter") sendMessage();
+    };
+
+    const handleBack = () => {
+        // 채팅방 나가기 및 읽음 처리 API 호출
+        fetch(`http://localhost:8080/api/chatrooms/leave?roomId=${roomId}&username=${username}`, {
+            method: "POST",
+            credentials: "include",
+        })
+            .then(response => {
+                if (response.ok) {
+                    router.push("/");
+                }
+            })
+            .catch(error => {
+                console.error("채팅방 나가기 중 오류:", error);
+            });
+    };
+
+    const handleLogout = async () => {
+        try {
+            const response = await fetch("http://localhost:8080/api/auth/logout", {
+                method: "POST",
+                credentials: "include",
+            });
+            if (response.ok) {
+                router.push("/login");
+            } else {
+                alert("로그아웃 실패");
+            }
+        } catch (error) {
+            console.error("로그아웃 중 오류 발생:", error);
+            alert("로그아웃 중 오류가 발생하였습니다.");
         }
     };
 
     return (
-        <div className="flex flex-col h-screen max-w-md mx-auto bg-gray-100">
-            {/* 헤더 영역 */}
-            <div className="bg-[#FFD700] p-4 flex items-center shadow-md">
-                <User className="mr-3 text-gray-700" />
-                <div>
-                    <h2 className="text-lg font-bold text-gray-800">
-                        {receiver ? receiver : "채팅 상대"}
-                    </h2>
-                    <p className="text-sm text-gray-600">{isConnected ? "온라인" : "오프라인"}</p>
-                    <p className="text-xs text-gray-500">채팅방 ID: {roomId}</p>
+        <div className="flex flex-col h-screen bg-gray-100">
+            <header className="bg-white shadow py-4 px-6 flex justify-between items-center">
+                <div className="flex items-center">
+                    <button onClick={handleBack} className="mr-4 text-blue-500 underline">
+                        뒤로가기
+                    </button>
+                    <h1 className="text-2xl font-bold">채팅방</h1>
                 </div>
-            </div>
-
-            {/* 메시지 목록 */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                {messages.map((msg, idx) => (
-                    <div key={idx} className={`flex ${msg.sender === username ? "justify-end" : "justify-start"}`}>
+                <div>
+                    <span className="mr-4">안녕하세요, {username}</span>
+                    <button
+                        onClick={handleLogout}
+                        className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition"
+                    >
+                        로그아웃
+                    </button>
+                </div>
+            </header>
+            <main className="flex-1 flex flex-col max-w-md mx-auto">
+                <div className="bg-yellow-400 p-4 flex items-center shadow-md">
+                    <User className="mr-3 text-gray-700" />
+                    <div>
+                        <h2 className="text-lg font-bold text-gray-800">
+                            {receiver ? receiver : "채팅 상대"}
+                        </h2>
+                        <p className="text-sm text-gray-600">
+                            {isConnected ? "온라인" : "오프라인"}
+                        </p>
+                        <p className="text-xs text-gray-500">채팅방 ID: {roomId}</p>
+                    </div>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                    {messages.map((msg, idx) => (
                         <div
-                            className={`max-w-[70%] p-3 rounded-lg ${
-                                msg.sender === username ? "bg-[#FFD700] text-gray-800" : "bg-white text-gray-800 shadow-md"
+                            key={idx}
+                            className={`flex ${
+                                msg.sender === username ? "justify-end" : "justify-start"
                             }`}
                         >
-                            {msg.sender !== username && <div className="font-bold text-sm mb-1">{msg.sender}</div>}
-                            <div>{msg.content}</div>
+                            <div
+                                className={`max-w-[70%] p-3 rounded-lg ${
+                                    msg.sender === username
+                                        ? "bg-yellow-400 text-gray-800"
+                                        : "bg-white text-gray-800 shadow-md"
+                                }`}
+                            >
+                                {msg.sender !== username && (
+                                    <div className="font-bold text-sm mb-1">{msg.sender}</div>
+                                )}
+                                <div>{msg.content}</div>
+                            </div>
                         </div>
-                    </div>
-                ))}
-                <div ref={messagesEndRef} />
-            </div>
-
-            {/* 메시지 입력창 */}
-            {isConnected && (
+                    ))}
+                    <div ref={messagesEndRef} />
+                </div>
                 <div className="bg-white p-4 border-t flex items-center space-x-2">
                     <input
                         type="text"
@@ -192,11 +253,14 @@ const ChatRoom: React.FC = () => {
                         placeholder="메시지를 입력하세요"
                         className="flex-1 p-2 border rounded-full"
                     />
-                    <button onClick={sendMessage} className="bg-[#FFD700] p-2 rounded-full hover:bg-yellow-500 transition">
+                    <button
+                        onClick={sendMessage}
+                        className="bg-yellow-400 p-2 rounded-full hover:bg-yellow-500 transition"
+                    >
                         <Send className="text-gray-800" size={20} />
                     </button>
                 </div>
-            )}
+            </main>
         </div>
     );
 };

@@ -7,8 +7,9 @@ import com.chatroom_test.chat.repository.ChatRoomRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
 
 @Service
 public class ChatService {
@@ -19,7 +20,6 @@ public class ChatService {
     @Autowired
     private ChatRoomRepository chatRoomRepository;
 
-    // 채팅방 ID 생성 (두 사용자 이름을 정렬하여 생성)
     public String getRoomId(String sender, String receiver) {
         if (sender.compareTo(receiver) < 0) {
             return sender + ":" + receiver;
@@ -36,7 +36,6 @@ public class ChatService {
         return chatMessageRepository.findBySenderAndReceiver(sender, receiver);
     }
 
-    // 채팅방 구독(없으면 생성) 기능
     public ChatRoom subscribeChatRoom(String sender, String receiver) {
         String roomId = getRoomId(sender, receiver);
         Optional<ChatRoom> optionalRoom = chatRoomRepository.findByRoomId(roomId);
@@ -48,12 +47,51 @@ public class ChatService {
         }
     }
 
-    // 특정 사용자가 참여한 채팅방 목록 조회
     public List<ChatRoom> getSubscribedChatRooms(String username) {
         return chatRoomRepository.findByUser1OrUser2(username, username);
     }
 
     public List<ChatMessage> getMessagesByRoomId(String roomId) {
         return chatMessageRepository.findByRoomIdOrderByIdAsc(roomId);
+    }
+
+    // unread 메시지 개수 계산 시 본인 메시지는 제외합니다.
+    public long getUnreadCount(String roomId, String username) {
+        Optional<ChatRoom> optionalRoom = chatRoomRepository.findByRoomId(roomId);
+        if(optionalRoom.isPresent()){
+            ChatRoom room = optionalRoom.get();
+            LocalDateTime lastRead = null;
+            if(username.equals(room.getUser1())){
+                lastRead = room.getLastReadAtUser1();
+            } else if(username.equals(room.getUser2())){
+                lastRead = room.getLastReadAtUser2();
+            }
+            if(lastRead == null) {
+                // 마지막 읽은 시간이 없으면, 전체 메시지 중 본인 메시지를 제외한 개수를 unread로 판단
+                return chatMessageRepository.findByRoomIdOrderByIdAsc(roomId).stream()
+                        .filter(cm -> !cm.getSender().equals(username))
+                        .count();
+            } else {
+                return chatMessageRepository.countUnreadMessages(roomId, lastRead, username);
+            }
+        }
+        return 0;
+    }
+
+    // 채팅방 나갈 때 현재 시각(now)으로 읽은 상태를 업데이트
+    public ChatRoom markChatRoomAsRead(String roomId, String username) {
+        Optional<ChatRoom> optionalRoom = chatRoomRepository.findByRoomId(roomId);
+        if(optionalRoom.isPresent()){
+            ChatRoom room = optionalRoom.get();
+            LocalDateTime now = LocalDateTime.now();
+
+            if(username.equals(room.getUser1())){
+                room.setLastReadAtUser1(now);
+            } else if(username.equals(room.getUser2())){
+                room.setLastReadAtUser2(now);
+            }
+            return chatRoomRepository.save(room);
+        }
+        return null;
     }
 }
