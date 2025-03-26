@@ -1,0 +1,44 @@
+plugins {
+    id 'org.springframework.boot' version '2.7.5'
+    id 'io.spring.dependency-management' version '1.0.14.RELEASE'
+    id 'java'
+}
+
+group = 'com.chatroom_test'
+version = '0.0.1-SNAPSHOT'
+sourceCompatibility = '11' // 또는 사용 중인 Java 버전에 맞게 설정
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Spring Boot 기본 웹 애플리케이션
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+
+    // Spring Boot Security
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+
+    // Spring Data JPA
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+
+    // Thymeleaf 템플릿 엔진 (로그인/회원가입 페이지 제공용)
+    implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+
+    // WebSocket 지원 (실시간 채팅)
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
+
+    // 임베디드 데이터베이스 (개발 단계에서는 H2 사용, 다른 DB 사용 시 변경)
+    runtimeOnly 'com.h2database:h2'
+
+    // 테스트 의존성
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+    runtimeOnly 'com.h2database:h2'
+
+    implementation 'org.projectlombok:lombok:1.18.28'
+}
+
+test {
+    useJUnitPlatform()
+}
