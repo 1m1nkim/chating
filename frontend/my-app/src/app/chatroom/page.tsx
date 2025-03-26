@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, {useState, useEffect, useRef} from "react";
 import * as SockJS from "sockjs-client";
-import { Stomp } from "@stomp/stompjs";
-import { Send, User } from "lucide-react";
-import { useSearchParams, useRouter } from "next/navigation";
+import {Stomp} from "@stomp/stompjs";
+import {Send, User} from "lucide-react";
+import {useSearchParams, useRouter} from "next/navigation";
 
 interface ChatMessage {
     sender: string;
@@ -75,7 +75,7 @@ const ChatRoom: React.FC = () => {
         try {
             const response = await fetch(
                 `http://localhost:8080/api/chat/historyByRoom?roomId=${roomId}`,
-                { credentials: "include" }
+                {credentials: "include"}
             );
             if (response.ok) {
                 const data: ChatMessage[] = await response.json();
@@ -120,7 +120,7 @@ const ChatRoom: React.FC = () => {
     // 스크롤 자동 이동
     useEffect(() => {
         if (messagesEndRef.current) {
-            messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+            messagesEndRef.current.scrollIntoView({behavior: "smooth"});
         }
     }, [messages]);
 
@@ -224,7 +224,7 @@ const ChatRoom: React.FC = () => {
             </header>
             <main className="flex-1 flex flex-col max-w-md mx-auto">
                 <div className="bg-yellow-400 p-4 flex items-center shadow-md">
-                    <User className="mr-3 text-gray-700" />
+                    <User className="mr-3 text-gray-700"/>
                     <div>
                         <h2 className="text-lg font-bold text-gray-800">
                             {receiver ? receiver : "채팅 상대"}
@@ -255,7 +255,7 @@ const ChatRoom: React.FC = () => {
                             </div>
                         </div>
                     ))}
-                    <div ref={messagesEndRef} />
+                    <div ref={messagesEndRef}/>
                 </div>
                 <div className="bg-white p-4 border-t flex items-center space-x-2">
                     <input
@@ -270,7 +270,7 @@ const ChatRoom: React.FC = () => {
                         onClick={sendMessage}
                         className="bg-yellow-400 p-2 rounded-full hover:bg-yellow-500 transition"
                     >
-                        <Send className="text-gray-800" size={20} />
+                        <Send className="text-gray-800" size={20}/>
                     </button>
                 </div>
             </main>
