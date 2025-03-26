@@ -26,7 +26,7 @@ const ChatRoom: React.FC = () => {
     const searchParams = useSearchParams();
     const router = useRouter();
 
-    // 현재 로그인한 사용자 정보 가져오기 (로그인 안되어 있으면 /login으로 리다이렉트)
+    // 현재 로그인한 사용자 확인
     useEffect(() => {
         const fetchCurrentUser = async () => {
             try {
@@ -40,14 +40,14 @@ const ChatRoom: React.FC = () => {
                     router.push("/login");
                 }
             } catch (err) {
-                console.error("현재 사용자 정보를 가져오는 중 오류 발생:", err);
+                console.error("현재 사용자 확인 중 오류 발생:", err);
                 router.push("/login");
             }
         };
         fetchCurrentUser();
     }, [router]);
 
-    // URL 쿼리 파라미터에서 roomId 또는 receiver 가져오기
+    // URL 매개변수를 통해 roomId 혹은 receiver 설정
     useEffect(() => {
         if (!username) return;
         const roomParam = searchParams.get("roomId");
@@ -69,30 +69,7 @@ const ChatRoom: React.FC = () => {
         }
     }, [username, searchParams]);
 
-    // 채팅방에 입장하면 읽음 처리 API를 호출하여 lastReadAt 업데이트
-    useEffect(() => {
-        if (username && roomId) {
-            fetch(`http://localhost:8080/api/chatrooms/${roomId}/read?username=${username}`, {
-                method: "POST",
-                credentials: "include",
-            })
-                .then((res) => {
-                    if (!res.ok) {
-                        console.error("읽음 처리 실패");
-                    }
-                })
-                .catch((error) => console.error("읽음 처리 중 오류 발생:", error));
-        }
-    }, [username, roomId]);
-
-    // 메시지 업데이트 시 스크롤을 최하단으로 이동
-    useEffect(() => {
-        if (messagesEndRef.current) {
-            messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-        }
-    }, [messages]);
-
-    // 채팅 이력 불러오기
+    // 채팅 기록 불러오기
     const loadHistory = async () => {
         if (!roomId) return;
         try {
@@ -104,14 +81,50 @@ const ChatRoom: React.FC = () => {
                 const data: ChatMessage[] = await response.json();
                 setMessages(data);
             } else {
-                console.error("채팅 이력 조회 실패", response.status);
+                console.error("채팅 기록 조회 실패", response.status);
             }
         } catch (error) {
-            console.error("채팅 이력 조회 중 오류 발생:", error);
+            console.error("채팅 기록 조회 중 오류 발생:", error);
         }
     };
 
-    // 웹소켓 연결
+    // 브라우저 창이 포커스될 때 읽음 처리 API 호출
+    useEffect(() => {
+        const handleFocus = () => {
+            if (username && roomId) {
+                fetch(`http://localhost:8080/api/chatrooms/${roomId}/read?username=${username}`, {
+                    method: "POST",
+                    credentials: "include",
+                }).catch(error => console.error("읽음 처리 중 오류 발생:", error));
+            }
+        };
+
+        window.addEventListener("focus", handleFocus);
+        return () => {
+            window.removeEventListener("focus", handleFocus);
+        };
+    }, [username, roomId]);
+
+    // 컴포넌트 언마운트 시 읽음 처리 API 호출 (즉시 업데이트)
+    useEffect(() => {
+        return () => {
+            if (username && roomId) {
+                fetch(`http://localhost:8080/api/chatrooms/${roomId}/read?username=${username}`, {
+                    method: "POST",
+                    credentials: "include",
+                }).catch(error => console.error("읽음 처리 중 오류 발생:", error));
+            }
+        };
+    }, [username, roomId]);
+
+    // 스크롤 자동 이동
+    useEffect(() => {
+        if (messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+        }
+    }, [messages]);
+
+    // WebSocket 연결 및 구독
     useEffect(() => {
         if (!username || !receiver || !roomId) return;
         loadHistory();
@@ -132,15 +145,17 @@ const ChatRoom: React.FC = () => {
         };
     }, [username, receiver, roomId]);
 
+    // 메시지 전송
     const sendMessage = () => {
         if (!stompClient) {
-            alert("먼저 연결해주세요");
+            alert("메시지 전송이 불가능합니다.");
             return;
         }
         if (!content.trim()) {
-            alert("메시지를 입력해주세요");
+            alert("메시지를 입력해주세요.");
             return;
         }
+        // 메시지 전송 시점에 정확한 시간을 기록
         const chatMessage: ChatMessage = {
             sender: username,
             receiver: receiver,
@@ -155,8 +170,8 @@ const ChatRoom: React.FC = () => {
         if (e.key === "Enter") sendMessage();
     };
 
+    // 채팅방 나가기 시 읽음 처리 API 호출
     const handleBack = () => {
-        // 채팅방 나가기 및 읽음 처리 API 호출
         fetch(`http://localhost:8080/api/chatrooms/leave?roomId=${roomId}&username=${username}`, {
             method: "POST",
             credentials: "include",
@@ -167,7 +182,7 @@ const ChatRoom: React.FC = () => {
                 }
             })
             .catch(error => {
-                console.error("채팅방 나가기 중 오류:", error);
+                console.error("채팅방 나가기 중 오류 발생:", error);
             });
     };
 
@@ -184,7 +199,7 @@ const ChatRoom: React.FC = () => {
             }
         } catch (error) {
             console.error("로그아웃 중 오류 발생:", error);
-            alert("로그아웃 중 오류가 발생하였습니다.");
+            alert("로그아웃 중 오류가 발생했습니다.");
         }
     };
 
@@ -198,7 +213,7 @@ const ChatRoom: React.FC = () => {
                     <h1 className="text-2xl font-bold">채팅방</h1>
                 </div>
                 <div>
-                    <span className="mr-4">안녕하세요, {username}</span>
+                    <span className="mr-4">현재 사용자: {username}</span>
                     <button
                         onClick={handleLogout}
                         className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition"
@@ -215,7 +230,7 @@ const ChatRoom: React.FC = () => {
                             {receiver ? receiver : "채팅 상대"}
                         </h2>
                         <p className="text-sm text-gray-600">
-                            {isConnected ? "온라인" : "오프라인"}
+                            {isConnected ? "연결됨" : "연결 대기중"}
                         </p>
                         <p className="text-xs text-gray-500">채팅방 ID: {roomId}</p>
                     </div>
@@ -224,9 +239,7 @@ const ChatRoom: React.FC = () => {
                     {messages.map((msg, idx) => (
                         <div
                             key={idx}
-                            className={`flex ${
-                                msg.sender === username ? "justify-end" : "justify-start"
-                            }`}
+                            className={`flex ${msg.sender === username ? "justify-end" : "justify-start"}`}
                         >
                             <div
                                 className={`max-w-[70%] p-3 rounded-lg ${

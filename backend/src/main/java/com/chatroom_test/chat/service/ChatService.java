@@ -6,6 +6,7 @@ import com.chatroom_test.chat.repository.ChatMessageRepository;
 import com.chatroom_test.chat.repository.ChatRoomRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -78,7 +79,7 @@ public class ChatService {
         return 0;
     }
 
-    // 채팅방 나갈 때 현재 시각(now)으로 읽은 상태를 업데이트
+    @Transactional
     public ChatRoom markChatRoomAsRead(String roomId, String username) {
         Optional<ChatRoom> optionalRoom = chatRoomRepository.findByRoomId(roomId);
         if(optionalRoom.isPresent()){
@@ -90,7 +91,7 @@ public class ChatService {
             } else if(username.equals(room.getUser2())){
                 room.setLastReadAtUser2(now);
             }
-            return chatRoomRepository.save(room);
+            return chatRoomRepository.saveAndFlush(room);
         }
         return null;
     }

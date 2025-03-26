@@ -7,6 +7,8 @@ import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
+import java.time.LocalDateTime;
+
 @Controller
 public class ChatController {
 
@@ -23,6 +25,7 @@ public class ChatController {
     public void sendMessage(ChatMessage chatMessage) {
         String roomId = chatService.getRoomId(chatMessage.getSender(), chatMessage.getReceiver());
         chatMessage.setRoomId(roomId);
+        chatMessage.setTimestamp(LocalDateTime.now());
         chatService.saveMessage(chatMessage);
         chatService.subscribeChatRoom(chatMessage.getSender(), chatMessage.getReceiver());
         messagingTemplate.convertAndSend("/topic/chat/" + roomId, chatMessage);
