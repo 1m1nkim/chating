@@ -1,17 +1,7 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-    async rewrites() {
-        return [
-            {
-                source: '/api/chat/history',
-                destination: 'http://localhost:8080/api/chat/history'
-            }
-        ];
-    },
-    // TypeScript 설정 추가
-    typescript: {
-        ignoreBuildErrors: true
-    }
+import type {NextConfig} from "next";
+
+const nextConfig: NextConfig = {
+    /* config options here */
 };
 
 export default nextConfig;
