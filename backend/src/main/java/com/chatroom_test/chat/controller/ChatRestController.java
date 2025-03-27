@@ -22,7 +22,7 @@ public class ChatRestController {
 		this.chatService = chatService;
 	}
 
-	// 새로 추가: roomId로 이력 조회
+	// chatroom의 메시지 기록 가져오기
 	@GetMapping("/historyByRoom")
 	public List<ChatMessage> getHistoryByRoom(@RequestParam String roomId) {
 		return chatService.getMessagesByRoomId(roomId);

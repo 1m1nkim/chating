@@ -8,7 +8,6 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
 import com.chatroom_test.chat.dto.ChatNotification;
-import com.chatroom_test.chat.dto.ChatRoomCreationResult;
 import com.chatroom_test.chat.dto.UnreadCountUpdate;
 import com.chatroom_test.chat.entity.ChatMessage;
 import com.chatroom_test.chat.service.ChatService;
@@ -25,32 +24,31 @@ public class ChatController {
 		this.chatService = chatService;
 	}
 
+	// 메시지 전송 처리
 	@MessageMapping("/chat.send")
 	public void sendMessage(ChatMessage chatMessage) {
-		// 채팅방 ID 결정 (정렬된 sender:receiver 형식)
 		String roomId = chatService.getRoomId(chatMessage.getSender(), chatMessage.getReceiver());
 		chatMessage.setRoomId(roomId);
 		chatMessage.setTimestamp(LocalDateTime.now());
 
-		// 메세지 저장 및 채팅방 구독 업데이트
+		// Redis에 메시지 저장 (중복 방지)
 		chatService.saveMessage(chatMessage);
 
-		ChatRoomCreationResult result = chatService.subscribeChatRoom(chatMessage.getSender(),
-			chatMessage.getReceiver());
-
-		// 채팅 메세지를 해당 채팅방으로 전송
+		// WebSocket을 통해 메시지 전송
 		messagingTemplate.convertAndSend("/topic/chat/" + roomId, chatMessage);
 
-		// 읽지 않은 메세지 카운트 계산 후 업데이트
+		// 상대방의 읽지 않은 메시지 개수 업데이트
+		// 상대방의 마지막 읽은 시간 (예시로 받는 시간 설정, 실제 값은 DB에서 가져올 수 있음)
 		long unreadCount = chatService.getUnreadCount(roomId, chatMessage.getReceiver());
 		UnreadCountUpdate update = new UnreadCountUpdate(roomId, unreadCount);
 		messagingTemplate.convertAndSend("/topic/unreadCount/" + chatMessage.getReceiver(), update);
 
-		if (result.isNewlyCreated()) {
-			// @님이 메세지를 요청하셨습니다. 형태
-			String notificationContent = String.format("%s님이 메세지를 요청하셨습니다.", chatMessage.getSender());
+		// 새 채팅방을 만들 때 알림 전송
+		if (chatService.subscribeChatRoom(chatMessage.getSender(), chatMessage.getReceiver()).isNewlyCreated()) {
+			String notificationContent = String.format("%s님이 채팅을 시작했습니다.", chatMessage.getSender());
 			ChatNotification notification = new ChatNotification(roomId, chatMessage.getSender(), notificationContent);
 			messagingTemplate.convertAndSend("/topic/notification/" + chatMessage.getReceiver(), notification);
 		}
 	}
 }
+

@@ -43,6 +43,10 @@ dependencies {
 
     annotationProcessor 'org.projectlombok:lombok:1.18.30' // 최신 버전 확인
     compileOnly 'org.projectlombok:lombok:1.18.30'
+
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.18.2'
 }
 
 test {
