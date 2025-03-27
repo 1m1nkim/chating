@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.chatroom_test.chat.dto.ChatRoomCreationResult;
 import com.chatroom_test.chat.entity.ChatMessage;
 import com.chatroom_test.chat.entity.ChatRoom;
 import com.chatroom_test.chat.repository.ChatMessageRepository;
@@ -42,14 +43,17 @@ public class ChatService {
 		return chatMessageRepository.findByRoomIdOrderByIdAsc(roomId);
 	}
 
-	public ChatRoom subscribeChatRoom(String sender, String receiver) {
+	public ChatRoomCreationResult subscribeChatRoom(String sender, String receiver) {
 		String roomId = getRoomId(sender, receiver);
 		Optional<ChatRoom> optionalRoom = chatRoomRepository.findByRoomId(roomId);
 		if (optionalRoom.isPresent()) {
-			return optionalRoom.get();
+			// 기존 채팅방
+			return new ChatRoomCreationResult(optionalRoom.get(), false);
 		} else {
+			// 새 채팅방 생성
 			ChatRoom newRoom = new ChatRoom(roomId, sender, receiver);
-			return chatRoomRepository.save(newRoom);
+			ChatRoom savedRoom = chatRoomRepository.save(newRoom);
+			return new ChatRoomCreationResult(savedRoom, true);
 		}
 	}
 
