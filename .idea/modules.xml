@@ -2,6 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/chatroom_test.main.iml" filepath="$PROJECT_DIR$/.idea/modules/chatroom_test.main.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/chatrooms.iml" filepath="$PROJECT_DIR$/.idea/chatrooms.iml" />
     </modules>
   </component>

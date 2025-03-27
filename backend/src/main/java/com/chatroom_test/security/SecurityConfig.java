@@ -6,7 +6,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -35,28 +34,28 @@ public class SecurityConfig {
 
 	@Bean
 	public AuthenticationManager authenticationManager(HttpSecurity http) throws Exception {
-		return http.getSharedObject(AuthenticationManagerBuilder.class)
-			.userDetailsService(userDetailsService)
-			.passwordEncoder(passwordEncoder())
-			.and()
-			.build();
+		// 먼저 Builder 객체를 받아온 뒤 체이닝을 마치고 build()
+		AuthenticationManagerBuilder builder = http.getSharedObject(AuthenticationManagerBuilder.class);
+		builder.userDetailsService(userDetailsService).passwordEncoder(passwordEncoder());
+
+		return builder.build();
 	}
 
 	@Bean
-	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+	SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 		http
 			// H2 콘솔 접근을 위해 frameOptions를 비활성화
 			.headers(headers -> headers.frameOptions(frameOptions -> frameOptions.disable()))
-			.cors(Customizer.withDefaults()) // CORS 설정
+			.cors(cors -> cors.configurationSource(corsConfigurationSource()))
 			.csrf(csrf -> csrf.disable())    // CSRF 비활성 (필요 시 활성화)
 
 			.authorizeHttpRequests(auth -> auth
 				// H2 콘솔 접근 허용
-				.antMatchers("/h2-console/**").permitAll()
+				.requestMatchers("/h2-console/**").permitAll()
 				// 회원가입, 로그인, me API는 누구나 접근 가능
-				.antMatchers("/api/auth/**").permitAll()
+				.requestMatchers("/api/auth/**").permitAll()
 				// WebSocket, 채팅 REST API 등도 필요하면 열어줌
-				.antMatchers("/ws-chat/**", "/api/chat/**").permitAll()
+				.requestMatchers("/ws-chat/**", "/api/chat/**").permitAll()
 				// 그 외는 인증 필요
 				.anyRequest().authenticated())
 			// 폼 로그인 안 쓰고, 완전 REST 방식

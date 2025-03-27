@@ -1,12 +1,18 @@
 plugins {
-    id 'org.springframework.boot' version '2.7.5'
-    id 'io.spring.dependency-management' version '1.0.14.RELEASE'
     id 'java'
+    id 'org.springframework.boot' version '3.4.2'
+    id 'io.spring.dependency-management' version '1.0.14.RELEASE'
 }
 
 group = 'com.chatroom_test'
 version = '0.0.1-SNAPSHOT'
-sourceCompatibility = '11' // 또는 사용 중인 Java 버전에 맞게 설정
+
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
 
 repositories {
     mavenCentral()
@@ -33,10 +39,10 @@ dependencies {
 
     // 테스트 의존성
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
-
     runtimeOnly 'com.h2database:h2'
 
-    implementation 'org.projectlombok:lombok:1.18.28'
+    annotationProcessor 'org.projectlombok:lombok:1.18.30' // 최신 버전 확인
+    compileOnly 'org.projectlombok:lombok:1.18.30'
 }
 
 test {

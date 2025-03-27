@@ -2,9 +2,6 @@ package com.chatroom_test.security;
 
 import java.util.Map;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -25,6 +22,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.chatroom_test.user.entity.User;
 import com.chatroom_test.user.repository.UserRepository;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -53,7 +53,7 @@ public class AuthController {
 	}
 
 	@PostMapping("/login")
-	public ResponseEntity<?> loginUser(@RequestBody Map<String, String> loginData) {
+	public ResponseEntity<?> loginUser(@RequestBody Map<String, String> loginData, HttpServletRequest request) {
 		String username = loginData.get("username");
 		String password = loginData.get("password");
 
@@ -62,6 +62,9 @@ public class AuthController {
 				new UsernamePasswordAuthenticationToken(username, password)
 			);
 			SecurityContextHolder.getContext().setAuthentication(auth);
+			// 세션에 SecurityContext 저장
+			request.getSession(true)
+				.setAttribute("SPRING_SECURITY_CONTEXT", SecurityContextHolder.getContext());
 			return ResponseEntity.ok("로그인 성공");
 		} catch (AuthenticationException e) {
 			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("로그인 실패");
