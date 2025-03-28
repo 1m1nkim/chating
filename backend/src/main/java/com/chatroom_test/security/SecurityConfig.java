@@ -73,6 +73,8 @@ public class SecurityConfig {
 		configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000"));
 		configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
 		configuration.setAllowedHeaders(Arrays.asList("*"));
+		configuration.setExposedHeaders(
+			Arrays.asList("Content-Type", "Content-Length, Authorization, X-File-Name, X-File-Size"));
 		// 세션 쿠키 포함 허용
 		configuration.setAllowCredentials(true);
 
