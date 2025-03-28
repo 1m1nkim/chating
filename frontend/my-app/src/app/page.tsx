@@ -20,12 +20,11 @@ interface ChatNotification {
 
 const ChatConnection: React.FC = () => {
     const [username, setUsername] = useState("");
-    const [receiver, setReceiver] = useState("");
+    const [receiver, setReceiver] = useState("");  // 자동으로 게시글 작성자 설정
     const [chatRooms, setChatRooms] = useState<ChatRoomResponse[]>([]);
-    // 보낸 사람별로 알림을 묶기 위해 Record 자료구조 사용
-    // 예: { 'userA': [{roomId, sender, contentSnippet}, ...], 'userB': [...], ... }
     const [notificationsBySender, setNotificationsBySender] = useState<Record<string, ChatNotification[]>>({});
     const router = useRouter();
+    const [postId, setPostId] = useState<string>("");  // 게시글 ID
 
     // 현재 로그인 사용자 확인
     useEffect(() => {
@@ -48,6 +47,29 @@ const ChatConnection: React.FC = () => {
         };
         fetchCurrentUser();
     }, [router]);
+
+    // 게시글 작성자 ID 설정
+    useEffect(() => {
+        const fetchPostDetails = async () => {
+            if (!postId) return;
+
+            try {
+                const response = await fetch(`http://localhost:8080/api/posts/${postId}`, {
+                    credentials: "include",
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    setReceiver(data.author);  // 게시글 작성자 ID로 receiver 설정
+                } else {
+                    console.error("게시글 조회 실패");
+                }
+            } catch (error) {
+                console.error("게시글 상세 조회 중 오류 발생:", error);
+            }
+        };
+
+        fetchPostDetails();
+    }, [postId]);
 
     // 채팅방 목록 조회
     const fetchChatRooms = async (user: string) => {
@@ -119,7 +141,6 @@ const ChatConnection: React.FC = () => {
             // 2) 새로운 메세지 알림 구독
             client.subscribe(`/topic/notification/${username}`, (message) => {
                 const notification: ChatNotification = JSON.parse(message.body);
-                // notificationsBySender 에 추가
                 setNotificationsBySender((prev) => {
                     const sender = notification.sender;
                     const existingList = prev[sender] || [];
@@ -136,12 +157,7 @@ const ChatConnection: React.FC = () => {
         };
     }, [username]);
 
-    // 모든 알림을 초기화 (예: “모두 지우기”)
-    const clearNotifications = () => {
-        setNotificationsBySender({});
-    };
-
-    // 새로운 채팅방 연결
+    // 새로운 채팅방 연결 (receiver는 게시글 작성자의 ID로 자동 설정)
     const handleConnect = async () => {
         if (!username) {
             alert("로그인이 필요합니다.");
@@ -168,7 +184,7 @@ const ChatConnection: React.FC = () => {
             }
         } catch (error) {
             console.error("채팅 상대 정보 확인 오류:", error);
-            alert("채팅 상대 정보 확인 중 오류가 발생했습니다.");
+            alert("채팅 상대 정보 확인 중 오류가 발생하였습니다.");
             return;
         }
         router.push(`/chatroom?receiver=${receiver}`);
@@ -176,7 +192,6 @@ const ChatConnection: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-gray-100 text-black">
-            {/* text-black 를 상위 div에 적용하여 모든 텍스트가 검정색으로 보이도록 */}
             <header className="bg-white shadow py-4 px-6 flex justify-between items-center">
                 <h1 className="text-2xl font-bold">채팅방 목록</h1>
                 <div>
@@ -196,7 +211,7 @@ const ChatConnection: React.FC = () => {
                         <div className="flex justify-between items-center mb-2">
                             <h2 className="text-lg font-semibold">새로운 알림</h2>
                             <button
-                                onClick={clearNotifications}
+                                onClick={() => setNotificationsBySender({})}
                                 className="text-sm text-blue-600 underline"
                             >
                                 모두 지우기
@@ -204,7 +219,6 @@ const ChatConnection: React.FC = () => {
                         </div>
                         {Object.entries(notificationsBySender).map(([sender, notifs]) => (
                             <div key={sender} className="mb-2">
-                                {/* 보낸 사람 구분 */}
                                 <div className="font-bold mb-1">{sender} 님 알림</div>
                                 <ul className="ml-4 list-disc">
                                     {notifs.map((notif, index) => (
@@ -224,21 +238,12 @@ const ChatConnection: React.FC = () => {
 
                 <div className="bg-white p-6 rounded shadow-md mb-6">
                     <h2 className="text-xl font-semibold mb-4">채팅 시작</h2>
-                    <div className="flex mb-4">
-                        <input
-                            type="text"
-                            value={receiver}
-                            onChange={(e) => setReceiver(e.target.value)}
-                            placeholder="채팅 상대 입력"
-                            className="flex-1 p-2 border rounded mr-2"
-                        />
-                        <button
-                            onClick={handleConnect}
-                            className="px-4 py-2 bg-yellow-500 text-gray-800 rounded hover:bg-yellow-600 transition"
-                        >
-                            연결
-                        </button>
-                    </div>
+                    <button
+                        onClick={handleConnect}
+                        className="px-4 py-2 bg-yellow-500 text-gray-800 rounded hover:bg-yellow-600 transition"
+                    >
+                        채팅 시작
+                    </button>
                 </div>
                 <div className="bg-white p-6 rounded shadow-md">
                     <h2 className="text-xl font-semibold mb-4">채팅방 목록</h2>
@@ -256,8 +261,8 @@ const ChatConnection: React.FC = () => {
                                     </button>
                                     {room.unreadCount > 0 && (
                                         <span className="bg-red-500 text-white rounded-full px-2 py-1 text-xs">
-                      {room.unreadCount}
-                    </span>
+                                            {room.unreadCount}
+                                        </span>
                                     )}
                                 </li>
                             ))}

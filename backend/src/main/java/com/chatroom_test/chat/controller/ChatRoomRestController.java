@@ -51,6 +51,4 @@ public class ChatRoomRestController {
 		}
 		return ResponseEntity.status(HttpStatus.NOT_FOUND).body("채팅방을 찾을 수 없습니다.");
 	}
-
 }
-
