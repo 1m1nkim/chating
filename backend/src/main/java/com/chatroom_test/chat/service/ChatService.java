@@ -2,10 +2,8 @@ package com.chatroom_test.chat.service;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -33,40 +31,37 @@ public class ChatService {
 
 	private static final String CHAT_MESSAGE_KEY_PREFIX = "chat:messages:";
 
-	// DB와 Redis에 저장된 메시지를 합치고, 중복 메시지를 제거한 후 정렬해서 반환
 	public List<ChatMessage> getMessagesByRoomId(String roomId) {
-		// DB에서 메시지 조회
-		List<ChatMessage> dbMessages = chatMessageRepository.findByRoomIdOrderByIdAsc(roomId);
-
 		// Redis에서 메시지 조회
 		List<ChatMessage> redisMessages = redisTemplate.opsForList().range(CHAT_MESSAGE_KEY_PREFIX + roomId, 0, -1);
 
-		// DB와 Redis의 메시지를 합침
-		List<ChatMessage> allMessages = new ArrayList<>(dbMessages);
-		if (redisMessages != null) {
-			allMessages.addAll(redisMessages);
+		// Redis에 메시지가 없으면 DB에서 조회하여 Redis에 저장
+		if (redisMessages == null || redisMessages.isEmpty()) {
+			// DB에서 메시지 조회
+			List<ChatMessage> dbMessages = chatMessageRepository.findByRoomIdOrderByIdAsc(roomId);
+			// Redis에 저장
+			if (dbMessages != null && !dbMessages.isEmpty()) {
+				redisTemplate.opsForList().rightPushAll(CHAT_MESSAGE_KEY_PREFIX + roomId, dbMessages);
+			}
+			return dbMessages; // Redis에 저장 후 DB 메시지를 반환
 		}
 
-		// 중복 제거: roomId, timestamp, sender, content 기준 (메시지 객체의 equals/hashCode에 의존하지 않고 TreeSet으로 처리)
-		List<ChatMessage> distinctMessages = allMessages.stream()
-			.collect(Collectors.collectingAndThen(
-				Collectors.toCollection(() -> new java.util.TreeSet<>(Comparator
-					.comparing((ChatMessage m) -> m.getRoomId() + m.getTimestamp() + m.getSender() + m.getContent()))),
-				ArrayList::new));
+		// Redis에서 반환된 값이 null일 경우 빈 리스트로 처리
+		if (redisMessages == null) {
+			redisMessages = new ArrayList<>();
+		}
 
-		// timestamp 기준 오름차순 정렬
-		distinctMessages.sort(Comparator.comparing(ChatMessage::getTimestamp));
-		return distinctMessages;
+		return redisMessages;
 	}
 
-	// Redis에 메시지 저장 (메시지 전송 시 한 번만 호출)
+	// 메시지를 Redis에 저장 (메시지 전송 시 한 번만 호출)
 	public void saveMessage(ChatMessage message) {
 		String key = CHAT_MESSAGE_KEY_PREFIX + message.getRoomId();
 		redisTemplate.opsForList().rightPush(key, message);
 	}
 
 	// 주기적으로 Redis에 저장된 메시지를 DB로 플러시 (중복 저장 방지를 위해 flush 후 Redis key 삭제)
-	@Scheduled(fixedRate = 50000)
+	@Scheduled(fixedRate = 30000)  // 30초마다 실행
 	@Transactional
 	public void flushMessagesToDB() {
 		Set<String> keys = redisTemplate.keys(CHAT_MESSAGE_KEY_PREFIX + "*");
@@ -76,7 +71,12 @@ public class ChatService {
 				if (messages != null && !messages.isEmpty()) {
 					// DB에 저장 (이미 DB에 있는 메시지와 중복될 가능성이 있으므로,
 					// 읽기 시 getMessagesByRoomId에서 deduplication을 수행하여 중복 문제를 해결)
-					chatMessageRepository.saveAll(messages);
+					for (ChatMessage message : messages) {
+						if (!chatMessageRepository.existsByRoomIdAndTimestamp(message.getRoomId(),
+							message.getTimestamp())) {
+							chatMessageRepository.save(message);
+						}
+					}
 					redisTemplate.delete(key);
 					System.out.println("Flushed " + messages.size() + " messages from Redis to DB for key: " + key);
 				}
@@ -89,10 +89,12 @@ public class ChatService {
 		return (sender.compareTo(receiver) < 0) ? sender + ":" + receiver : receiver + ":" + sender;
 	}
 
+	// 채팅방에 가입된 사용자 목록 조회
 	public List<ChatRoom> getSubscribedChatRooms(String username) {
 		return chatRoomRepository.findByUser1OrUser2(username, username);
 	}
 
+	// 채팅방 구독 및 생성
 	public ChatRoomCreationResult subscribeChatRoom(String sender, String receiver) {
 		String roomId = getRoomId(sender, receiver);
 		return chatRoomRepository.findByRoomId(roomId)
@@ -123,7 +125,6 @@ public class ChatService {
 			.filter(cm -> !cm.getSender().equals(username))
 			.filter(cm -> finalLastRead == null || cm.getTimestamp().isAfter(finalLastRead))
 			.count();
-
 	}
 
 	// 채팅방 읽음 처리: 사용자가 채팅방에 들어갈 때 해당 사용자의 lastReadAt 갱신

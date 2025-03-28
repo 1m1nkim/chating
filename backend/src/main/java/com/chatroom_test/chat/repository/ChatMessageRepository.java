@@ -1,13 +1,13 @@
 package com.chatroom_test.chat.repository;
 
-import com.chatroom_test.chat.entity.ChatMessage;
+import java.time.LocalDateTime;
+import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.time.LocalDateTime;
-import java.util.List;
+import com.chatroom_test.chat.entity.ChatMessage;
 
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> {
 	List<ChatMessage> findBySenderAndReceiver(String sender, String receiver);
@@ -20,4 +20,7 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
 		@Param("lastRead") LocalDateTime lastRead,
 		@Param("username") String username);
 
+	// 중복된 메시지가 DB에 이미 존재하는지 확인
+	boolean existsByRoomIdAndTimestamp(@Param("roomId") String roomId,
+		@Param("timestamp") LocalDateTime timestamp);
 }
