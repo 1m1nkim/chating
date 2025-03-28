@@ -1,5 +1,6 @@
 package com.chatroom_test.chat.controller;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.chatroom_test.chat.dto.ChatRoomResponse;
+import com.chatroom_test.chat.entity.ChatMessage;
 import com.chatroom_test.chat.entity.ChatRoom;
 import com.chatroom_test.chat.service.ChatService;
 
@@ -39,7 +41,10 @@ public class ChatRoomRestController {
 		List<ChatRoom> rooms = chatService.getSubscribedChatRooms(username);
 		return rooms.stream().map(room -> {
 			long unread = chatService.getUnreadCount(room.getRoomId(), username);
-			return new ChatRoomResponse(room, username, unread);
+			ChatMessage lastMsg = chatService.getLastMessage(room.getRoomId());
+			String lastMessage = lastMsg != null ? lastMsg.getContent() : "";
+			LocalDateTime lastMessageTime = lastMsg != null ? lastMsg.getTimestamp() : null;
+			return new ChatRoomResponse(room, username, unread, lastMessage, lastMessageTime);
 		}).collect(Collectors.toList());
 	}
 

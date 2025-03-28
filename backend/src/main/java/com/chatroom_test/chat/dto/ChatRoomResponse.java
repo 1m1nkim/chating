@@ -1,14 +1,22 @@
 package com.chatroom_test.chat.dto;
 
+import java.time.LocalDateTime;
+
 import com.chatroom_test.chat.entity.ChatRoom;
 
+import lombok.Getter;
+
+@Getter
 public class ChatRoomResponse {
 	private Long id;
 	private String roomId;
 	private String displayName;
 	private long unreadCount;
+	private String lastMessage;
+	private LocalDateTime lastMessageTime;
 
-	public ChatRoomResponse(ChatRoom room, String currentUsername, long unreadCount) {
+	public ChatRoomResponse(ChatRoom room, String currentUsername, long unreadCount, String lastMessage,
+		LocalDateTime lastMessageTime) {
 		this.id = room.getId();
 		this.roomId = room.getRoomId();
 		if (room.getUser1().equals(room.getUser2())) {
@@ -23,22 +31,8 @@ public class ChatRoomResponse {
 			}
 		}
 		this.unreadCount = unreadCount;
+		this.lastMessage = lastMessage;
+		this.lastMessageTime = lastMessageTime;
 	}
 
-	// Getter
-	public Long getId() {
-		return id;
-	}
-
-	public String getRoomId() {
-		return roomId;
-	}
-
-	public String getDisplayName() {
-		return displayName;
-	}
-
-	public long getUnreadCount() {
-		return unreadCount;
-	}
 }

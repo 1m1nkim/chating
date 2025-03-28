@@ -140,4 +140,12 @@ public class ChatService {
 			return chatRoomRepository.saveAndFlush(room);
 		}).orElse(null);
 	}
+
+	public ChatMessage getLastMessage(String roomId) {
+		List<ChatMessage> messages = getMessagesByRoomId(roomId);
+		if (messages == null || messages.isEmpty()) {
+			return null;
+		}
+		return messages.get(messages.size() - 1);
+	}
 }
