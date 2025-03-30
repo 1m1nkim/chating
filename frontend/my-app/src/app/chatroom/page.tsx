@@ -1,6 +1,8 @@
 'use client';
 
-import React, {useRef, useState} from "react";
+import React, {useEffect, useRef, useState} from "react";
+import * as SockJS from "sockjs-client";
+import {Stomp} from "@stomp/stompjs";
 import {Paperclip, Send} from "lucide-react";
 import {useRouter, useSearchParams} from "next/navigation";
 
@@ -27,6 +29,119 @@ const ChatRoom: React.FC = () => {
     const searchParams = useSearchParams();
     const router = useRouter();
 
+    // 현재 사용자 확인
+    useEffect(() => {
+        const fetchCurrentUser = async () => {
+            try {
+                const response = await fetch("http://localhost:8080/api/auth/me", {
+                    credentials: "include",
+                });
+                if (response.ok) {
+                    const data = await response.text();
+                    setUsername(data);
+                } else {
+                    router.push("/login");
+                }
+            } catch (err) {
+                console.error("현재 사용자 확인 중 오류 발생:", err);
+                router.push("/login");
+            }
+        };
+        fetchCurrentUser();
+    }, [router]);
+
+    // 채팅방 ID 및 상대방 설정
+    useEffect(() => {
+        if (!username) return;
+        const roomParam = searchParams.get("roomId");
+        const receiverParam = searchParams.get("receiver");
+
+        if (roomParam) {
+            setRoomId(roomParam);
+            const parts = roomParam.split(":");
+            if (parts.length === 2) {
+                setReceiver(parts[0] === username ? parts[1] : parts[0]);
+            }
+        } else if (receiverParam) {
+            setReceiver(receiverParam);
+            const computedRoomId =
+                username < receiverParam
+                    ? `${username}:${receiverParam}`
+                    : `${receiverParam}:${username}`;
+            setRoomId(computedRoomId);
+        }
+    }, [username, searchParams]);
+
+    // 채팅 기록 로드
+    const loadHistory = async () => {
+        if (!roomId) return;
+        try {
+            const response = await fetch(
+                `http://localhost:8080/api/chat/historyByRoom?roomId=${roomId}`,
+                {credentials: "include"}
+            );
+            if (response.ok) {
+                const data: ChatMessage[] = await response.json();
+                setMessages(data);
+            } else {
+                console.error("채팅 기록 조회 실패", response.status);
+            }
+        } catch (error) {
+            console.error("채팅 기록 조회 중 오류 발생:", error);
+        }
+    };
+
+    // WebSocket 연결 설정
+    useEffect(() => {
+        if (!username || !receiver || !roomId) return;
+        loadHistory();
+        const socket = new SockJS("http://localhost:8080/ws-chat");
+        const client = Stomp.over(socket);
+        client.connect({}, (frame: any) => {
+            console.log("Connected: " + frame);
+            setIsConnected(true);
+            client.subscribe(`/topic/chat/${roomId}`, (message: any) => {
+                const msg: ChatMessage = JSON.parse(message.body);
+                setMessages((prev) => [...prev, msg]);
+            });
+        });
+        setStompClient(client);
+
+        return () => {
+            if (client) client.disconnect(() => console.log("Disconnected"));
+        };
+    }, [username, receiver, roomId]);
+
+    // 메시지 전송
+    const sendMessage = () => {
+        if (!stompClient) {
+            alert("메시지 전송이 불가능합니다.");
+            return;
+        }
+        if (!content.trim() && !file) {
+            alert("메시지를 입력하거나 파일을 선택해주세요.");
+            return;
+        }
+
+        if (file) {
+            uploadFile();
+        } else {
+            sendTextMessage(content);
+        }
+    };
+
+    // 텍스트 메시지 전송
+    const sendTextMessage = (textContent: string) => {
+        const chatMessage: ChatMessage = {
+            sender: username,
+            receiver: receiver,
+            content: textContent,
+            timestamp: new Date().toISOString(),
+        };
+        stompClient.send("/app/chat.send", {}, JSON.stringify(chatMessage));
+        setContent("");
+    };
+
     // 파일 업로드 처리
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         if (event.target.files && event.target.files[0]) {
@@ -34,6 +149,7 @@ const ChatRoom: React.FC = () => {
         }
     };
 
+    // 파일 업로드 API 호출
     const uploadFile = async () => {
         if (!file) return;
 
@@ -61,20 +177,20 @@ const ChatRoom: React.FC = () => {
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
-    // 파일 메시지 전송
     const sendFileMessage = (fileUrl: string) => {
         if (!stompClient) return;
 
         const chatMessage: ChatMessage = {
             sender: username,
             receiver: receiver,
-            content: `Uploaded a file`,
+            content: '이미지 전송', // 원하는 문구 설정 가능
             timestamp: new Date().toISOString(),
-            fileUrl,
+            fileUrl, // 반드시 전달
         };
 
         stompClient.send("/app/chat.send", {}, JSON.stringify(chatMessage));
     };
+
 
     return (
         <div className="flex flex-col h-screen bg-gray-100">
@@ -119,7 +235,7 @@ const ChatRoom: React.FC = () => {
                             className="bg-gray-200 p-2 rounded-full hover:bg-gray-300 transition">
                         <Paperclip size={20}/>
                     </button>
-                    <button onClick={() => uploadFile()}
+                    <button onClick={sendMessage}
                             className="bg-yellow-400 p-2 rounded-full hover:bg-yellow-500 transition">
                         <Send size={20}/>
                     </button>
