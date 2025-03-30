@@ -43,6 +43,13 @@ public class FileUploadController {
 				"message", "파일 업로드 실패: " + e.getMessage()
 			));
 		}
+
+		//만약 ec2에 저장하게 된다면 ?
+		// String uploadDir = "/home/ubuntu/images/";
+		// String fileName = file.getOriginalFilename();
+		//
+		// File destination = new File(uploadDir + fileName);
+		// file.transferTo(destination);
 	}
 
 	@GetMapping("/url/{fileName}")

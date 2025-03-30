@@ -26,7 +26,7 @@ public class ChatRoomRestController {
 	@Autowired
 	private ChatService chatService;
 
-	// 기존 채팅방 목록 API와 함께, 읽은 처리 API도 추가
+	// 채팅방 읽음 처리 API (또는 채팅방 나가기 시 읽음 처리)
 	@PostMapping("/{roomId}/read")
 	public ResponseEntity<?> markAsRead(@PathVariable String roomId, @RequestParam String username) {
 		ChatRoom updatedRoom = chatService.markChatRoomAsRead(roomId, username);
@@ -48,6 +48,7 @@ public class ChatRoomRestController {
 		}).collect(Collectors.toList());
 	}
 
+	// 채팅방 나가기 시 읽음 처리 API
 	@PostMapping("/leave")
 	public ResponseEntity<?> leaveChatRoom(@RequestParam String roomId, @RequestParam String username) {
 		ChatRoom updatedRoom = chatService.markChatRoomAsRead(roomId, username);

@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import React, {useEffect, useRef, useState} from "react";
 import * as SockJS from "sockjs-client";
@@ -112,6 +112,34 @@ const ChatRoom: React.FC = () => {
         };
     }, [username, receiver, roomId]);
 
+    // ★ 읽음 처리 로직 추가 ★
+    // 채팅방에 입장하면 해당 채팅방의 읽음 처리 API를 호출하여,
+    // 사용자의 읽지 않은 메시지를 초기화합니다.
+    useEffect(() => {
+        if (roomId && username) {
+            fetch(`http://localhost:8080/api/chatrooms/${roomId}/read?username=${username}`, {
+                method: "POST",
+                credentials: "include",
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        console.warn("읽음 처리 응답 상태:", response.status);
+                        return null;
+                    }
+                    return response.text();
+                })
+                .then(data => {
+                    if (data) {
+                        console.log("Mark as read response:", data);
+                    }
+                })
+                .catch(error => {
+                    console.error("Error marking chat room as read:", error);
+                });
+        }
+    }, [roomId, username]);
+    // ★ 여기까지 읽음 처리 로직 추가 ★
+
     // 메시지 전송
     const sendMessage = () => {
         if (!stompClient) {
@@ -154,27 +182,27 @@ const ChatRoom: React.FC = () => {
         if (!file) return;
 
         const formData = new FormData();
-        formData.append('file', file);
+        formData.append("file", file);
 
         try {
-            const response = await fetch('http://localhost:8080/api/files/upload', {
-                method: 'POST',
+            const response = await fetch("http://localhost:8080/api/files/upload", {
+                method: "POST",
                 body: formData,
-                credentials: 'include',
+                credentials: "include",
             });
 
             if (response.ok) {
                 const data = await response.json();
                 sendFileMessage(data.fileUrl); // 파일 URL 전송
             } else {
-                console.error('파일 업로드 실패');
+                console.error("파일 업로드 실패");
             }
         } catch (error) {
-            console.error('파일 업로드 중 오류 발생:', error);
+            console.error("파일 업로드 중 오류 발생:", error);
         }
 
         setFile(null);
-        if (fileInputRef.current) fileInputRef.current.value = '';
+        if (fileInputRef.current) fileInputRef.current.value = "";
     };
 
     const sendFileMessage = (fileUrl: string) => {
@@ -183,14 +211,13 @@ const ChatRoom: React.FC = () => {
         const chatMessage: ChatMessage = {
             sender: username,
             receiver: receiver,
-            content: '이미지 전송', // 원하는 문구 설정 가능
+            content: "이미지 전송", // 원하는 문구 설정 가능
             timestamp: new Date().toISOString(),
             fileUrl, // 반드시 전달
         };
 
         stompClient.send("/app/chat.send", {}, JSON.stringify(chatMessage));
     };
-
 
     return (
         <div className="flex flex-col h-screen bg-gray-100">
@@ -205,7 +232,10 @@ const ChatRoom: React.FC = () => {
                     {messages.map((msg, idx) => (
                         <div key={idx} className={`flex ${msg.sender === username ? "justify-end" : "justify-start"}`}>
                             <div
-                                className={`max-w-[70%] p-3 rounded-lg ${msg.sender === username ? "bg-yellow-400 text-gray-800" : "bg-white text-gray-800 shadow-md"}`}>
+                                className={`max-w-[70%] p-3 rounded-lg ${
+                                    msg.sender === username ? "bg-yellow-400 text-gray-800" : "bg-white text-gray-800 shadow-md"
+                                }`}
+                            >
                                 {msg.sender !== username && (
                                     <div className="font-bold text-sm mb-1">{msg.sender}</div>
                                 )}
@@ -231,8 +261,10 @@ const ChatRoom: React.FC = () => {
                         className="flex-1 p-2 border rounded-full"
                     />
                     <input type="file" onChange={handleFileChange} ref={fileInputRef} className="hidden"/>
-                    <button onClick={() => fileInputRef.current?.click()}
-                            className="bg-gray-200 p-2 rounded-full hover:bg-gray-300 transition">
+                    <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="bg-gray-200 p-2 rounded-full hover:bg-gray-300 transition"
+                    >
                         <Paperclip size={20}/>
                     </button>
                     <button onClick={sendMessage}

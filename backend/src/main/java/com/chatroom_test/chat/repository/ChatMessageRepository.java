@@ -10,17 +10,19 @@ import org.springframework.data.repository.query.Param;
 import com.chatroom_test.chat.entity.ChatMessage;
 
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> {
+
 	List<ChatMessage> findBySenderAndReceiver(String sender, String receiver);
 
-	List<ChatMessage> findByRoomIdOrderByIdAsc(String roomId);
+	// findByChatRoomRoomIdOrderByIdAsc: 채팅방(roomId) 기준으로 오름차순 정렬
+	List<ChatMessage> findByChatRoomRoomIdOrderByIdAsc(String roomId);
 
-	// 본인이 보낸 메시지는 unread 카운트에서 제외하도록 조건 추가
-	@Query("select count(cm) from ChatMessage cm where cm.roomId = :roomId and cm.timestamp > :lastRead and cm.sender <> :username")
+	// 채팅방의 마지막 읽은 시간 이후에 수신된 상대방 메시지 개수를 계산
+	@Query("select count(cm) from ChatMessage cm where cm.chatRoom.roomId = :roomId and cm.timestamp > :lastRead and cm.sender <> :username")
 	long countUnreadMessages(@Param("roomId") String roomId,
 		@Param("lastRead") LocalDateTime lastRead,
 		@Param("username") String username);
 
-	// 중복된 메시지가 DB에 이미 존재하는지 확인
-	boolean existsByRoomIdAndTimestamp(@Param("roomId") String roomId,
+	// 중복 메시지 저장 여부 확인
+	boolean existsByChatRoomRoomIdAndTimestamp(@Param("roomId") String roomId,
 		@Param("timestamp") LocalDateTime timestamp);
 }
