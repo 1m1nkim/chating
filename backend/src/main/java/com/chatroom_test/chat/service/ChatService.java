@@ -98,7 +98,7 @@ public class ChatService {
 
 	// 채팅방에 가입된 사용자 목록 조회
 	public List<ChatRoom> getSubscribedChatRooms(String username) {
-		return chatRoomRepository.findByUser1OrUser2(username, username);
+		return chatRoomRepository.findByClientOrExpert(username, username);
 	}
 
 	// 채팅방 구독 및 생성 (신규 채팅방일 경우 true 반환)
@@ -119,9 +119,9 @@ public class ChatService {
 		if (room == null)
 			return 0;
 		LocalDateTime lastRead = null;
-		if (username.equals(room.getUser1())) {
+		if (username.equals(room.getClient())) {
 			lastRead = room.getLastReadAtUser1();
-		} else if (username.equals(room.getUser2())) {
+		} else if (username.equals(room.getExpert())) {
 			lastRead = room.getLastReadAtUser2();
 		}
 		List<ChatMessage> allMessages = getMessagesByRoomId(roomId);
@@ -137,9 +137,9 @@ public class ChatService {
 	public ChatRoom markChatRoomAsRead(String roomId, String username) {
 		return chatRoomRepository.findByRoomId(roomId).map(room -> {
 			LocalDateTime now = LocalDateTime.now();
-			if (username.equals(room.getUser1())) {
+			if (username.equals(room.getClient())) {
 				room.setLastReadAtUser1(now);
-			} else if (username.equals(room.getUser2())) {
+			} else if (username.equals(room.getExpert())) {
 				room.setLastReadAtUser2(now);
 			}
 			return chatRoomRepository.saveAndFlush(room);

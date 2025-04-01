@@ -7,8 +7,6 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
@@ -23,14 +21,11 @@ import lombok.Setter;
 @NoArgsConstructor
 public class ChatRoom {
 	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	private Long id;
-
 	@Column(unique = true, nullable = false)
 	private String roomId;
 
-	private String user1;
-	private String user2;
+	private String client;
+	private String expert;
 
 	private LocalDateTime lastReadAtUser1;
 	private LocalDateTime lastReadAtUser2;
@@ -39,9 +34,9 @@ public class ChatRoom {
 	@JsonIgnore            //redis의 직렬화를 생략하기 위함
 	private List<ChatMessage> messages;
 
-	public ChatRoom(String roomId, String user1, String user2) {
+	public ChatRoom(String roomId, String client, String expert) {
 		this.roomId = roomId;
-		this.user1 = user1;
-		this.user2 = user2;
+		this.client = client;
+		this.expert = expert;
 	}
 }
